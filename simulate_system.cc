@@ -25,6 +25,7 @@ void update_parameters(double n)
 	return;
 }
 
+// Get maximum charging for stationary battery
 double calc_max_charging(double power, double b_prev)
 {
 
@@ -42,6 +43,7 @@ double calc_max_charging(double power, double b_prev)
 	return 0;
 }
 
+// Get maximum discharging from stationary battery
 double calc_max_discharging(double power, double b_prev)
 {
 
@@ -59,6 +61,7 @@ double calc_max_discharging(double power, double b_prev)
 	return 0;
 }
 
+// Get maximum charging for EV battery
 double calc_max_charging_ev(double power, double ev_b)
 {
 	double step = power / 30.0;
@@ -76,6 +79,7 @@ double calc_max_charging_ev(double power, double ev_b)
 	return 0;
 }
 
+// Get maximum discharging from EV battery
 double calc_max_discharging_ev(double power, double ev_b, double min_soc, double ev_battery_size)
 {
 	double step = power / 30.0;
@@ -116,7 +120,9 @@ bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, in
 	// Find the number of hours until departure.
 	int hours_until_dept = (24 + next_dept - currentHour) % 24;
 
-	// TODO: It is possible that we don't quite reach the full battery level if we discharge in the hour before charging starts.
+	// Note: It is possible that we don't quite reach the full battery level if we discharge in the hour before charging starts.
+	// This is insignificant as the EV battery update logic was changed to subtract the electricity used from the previous battery level instead
+	// of assuming a full battery at departure and reading the battery level at arrival.
 	if (hours_needed >= hours_until_dept)
 	{
 		return true;
@@ -124,6 +130,7 @@ bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, in
 	return false;
 }
 
+// Called when operational policy "no_ev" is chosen
 std::pair<double, double> no_ev(double b, double c, double d, int hour)
 {
 	// There is leftover solar power after covering household and expected EV load
@@ -162,6 +169,7 @@ std::pair<double, double> no_ev(double b, double c, double d, int hour)
 	return std::make_pair(0, b);
 }
 
+// Called when operational policy "safe_unidirectional" is chosen
 std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, double isHome, int hour)
 {
 	if (isCharging == true)
@@ -213,6 +221,7 @@ std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, d
 	return std::make_pair(ev_b, b);
 }
 
+// Called when operational policy "hybrid_bidirectional" is chosen
 std::pair<double, double> hybrid_bidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, bool isHome, int hour)
 {
 	if (isCharging == true)
@@ -259,11 +268,13 @@ std::pair<double, double> hybrid_bidirectional(double b, double ev_b, double c, 
 	// Electricity is missing to cover household and expected EV load
 	else if (d > 0)
 	{
+		// First cover load from stationary battery
 		double max_d = fmin(calc_max_discharging(d, b), alpha_d);
 		b = b - max_d * eta_d * T_u;
 		stat_discharged += max_d;
 		double res = d - max_d;
 
+		// If energy still missing, discharge EV
 		if (res > 0 && isCharging == false && isHome == true)
 		{
 			double max_d_ev = fmin(calc_max_discharging_ev(res, ev_b, min_soc, ev_battery_capacity), discharging_rate / (eta_d_ev * T_u));
@@ -304,6 +315,8 @@ double get_maxCharging(double ev_b)
 	return calc_max_charging_ev(available_power, ev_b);
 }
 
+// Get current EV battery level. It is the same as in previous step except if the EV arrives from a trip. In that case,
+// the electricity used for driving is subtracted from the previous battery level.
 double get_ev_b(std::vector<EVStatus> &dailyStatuses, int hour, double last_soc)
 {
 	double ev_b = last_soc;
@@ -311,7 +324,6 @@ double get_ev_b(std::vector<EVStatus> &dailyStatuses, int hour, double last_soc)
 	{
 		ev_b -= dailyStatuses[hour - 1].powerUsed;
 		ev_power_used += dailyStatuses[hour - 1].powerUsed;
-		// std::cout << "car arrived back home, power used: " << dailyStatuses[hour - 1].powerUsed << " last soc: " << last_soc << " new ev: " << ev_b << std::endl;
 	}
 
 	return ev_b;
@@ -334,6 +346,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 	double b = 0.0; // Start simulation with an empty stationary battery
 	double c = 0.0; // Remaining solar energy after covering household and EV charging load
 	double d = 0.0; // Missing energy to cover household and EV charging load after using produced solar energy.
+
 	// We assume that the initial battery charge of the EV comes from the grid.
 	if (Operation_policy != "no_ev")
 	{
@@ -372,6 +385,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 			load_sum += load_trace[index_t_load];
 
 			std::pair<double, double> operationResult;
+			// Household doesn't have an EV
 			if (Operation_policy == "no_ev")
 			{
 				double hourly_load = load_trace[index_t_load];
@@ -382,6 +396,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 
 				operationResult = no_ev(b, c, d, hour);
 			}
+			// Household has EV
 			else
 			{
 				bool isCharging = false;
