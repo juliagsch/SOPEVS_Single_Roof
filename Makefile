@@ -1,7 +1,10 @@
-all: sim 
+all: load_curve 
 
 sim: 
 	g++ -std=c++14 -O2 run_simulation.cc cheby.cc simulate_system.cc common.cc ev.cc -o bin/sim
+
+load_curve: 
+	g++ -std=c++14 -O2 run_simulation_load_curve.cc cheby.cc simulate_system_load_curve.cc params_load_curve.cc params_common.cc ev.cc -o bin/sim
 
 debug: debug_sim 
 
