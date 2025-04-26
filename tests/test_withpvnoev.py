@@ -6,13 +6,14 @@ from test_utils import extract_result
 
 test_data_path = os.path.abspath("./tests/test_data")
 eta_ev = 0.935 # Charging and discharging efficiency of the EV
+intensity_path = f"{test_data_path}/intensities.txt"
 
 def test_no_ev():
     house_file_path = f"{test_data_path}/house1.txt"
     solar_file_path = f"{test_data_path}/solar1.txt"
     ev_file_path = f"{test_data_path}/ev1.csv"
     num_days = 1
-    command = f"./bin_withpvnoev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 no_ev {ev_file_path} 0 4"
+    command = f"./bin_withpvnoev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 no_ev {ev_file_path} 0 4 {intensity_path}"
     result = subprocess.run(command.split(), stdout=subprocess.PIPE, text=True)
 
     # Extract numbers from output
@@ -33,8 +34,8 @@ def test_ev_vs_noev():
     ev_file_path = f"{test_data_path}/ev1.csv"
     op_bi = "hybrid_bidirectional"
     num_days = 1
-    command_no_ev = f"./bin_withpvnoev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 no_ev {ev_file_path} 0 4"
-    command_ev = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
+    command_no_ev = f"./bin_withpvnoev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 no_ev {ev_file_path} 0 4 {intensity_path}"
+    command_ev = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path}"
 
     command_no_ev = subprocess.run(command_no_ev.split(), stdout=subprocess.PIPE, text=True)
     command_ev = subprocess.run(command_ev.split(), stdout=subprocess.PIPE, text=True)

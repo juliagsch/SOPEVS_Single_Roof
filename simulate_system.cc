@@ -131,7 +131,7 @@ bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, in
 }
 
 // Called when operational policy "no_ev" is chosen
-std::pair<double, double> no_ev(double b, double c, double d, int hour)
+std::pair<double, double> no_ev(double b, double c, double d, int hour, double grid_intensity)
 {
 	// There is leftover solar power after covering household and expected EV load
 	if (c > 0)
@@ -153,6 +153,7 @@ std::pair<double, double> no_ev(double b, double c, double d, int hour)
 			loss_events += 1;
 			load_deficit += res;
 			grid_import += res;
+			grid_emissions += res * grid_intensity;
 
 			if (hour == 0 || hour == 1 || hour == 2 || hour == 3 || hour == 4)
 			{
@@ -170,7 +171,7 @@ std::pair<double, double> no_ev(double b, double c, double d, int hour)
 }
 
 // Called when operational policy "safe_unidirectional" is chosen
-std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, double isHome, int hour)
+std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, double isHome, int hour, double grid_intensity)
 {
 	if (isCharging == true)
 	{
@@ -203,6 +204,7 @@ std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, d
 			loss_events += 1;
 			load_deficit += res;
 			grid_import += res;
+			grid_emissions += res * grid_intensity;
 
 			if (hour == 0 || hour == 1 || hour == 2 || hour == 3 || hour == 4)
 			{
@@ -222,7 +224,7 @@ std::pair<double, double> safe_unidirectional(double b, double ev_b, double c, d
 }
 
 // Called when operational policy "hybrid_bidirectional" is chosen
-std::pair<double, double> hybrid_bidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, bool isHome, int hour)
+std::pair<double, double> hybrid_bidirectional(double b, double ev_b, double c, double d, bool isCharging, double maxCharging, bool isHome, int hour, double grid_intensity)
 {
 	if (isCharging == true)
 	{
@@ -293,6 +295,7 @@ std::pair<double, double> hybrid_bidirectional(double b, double ev_b, double c, 
 			loss_events += 1;
 			load_deficit += res;
 			grid_import += res;
+			grid_emissions += res * grid_intensity;
 			if (hour == 0 || hour == 1 || hour == 2 || hour == 3 || hour == 4)
 			{
 				// special grid tariff for home load
@@ -330,13 +333,14 @@ double get_ev_b(std::vector<EVStatus> &dailyStatuses, int hour, double last_soc)
 }
 
 // call it with a specific battery and PV size and want to compute the loss
-double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_index, int end_index, double cells, double pv, double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start)
+double sim(vector<double> &load_trace, vector<double> &solar_trace, vector<double> &intensity_trace, int start_index, int end_index, double cells, double pv, double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start)
 {
 	update_parameters(cells);
 	loss_events = 0;
 	load_deficit = 0;
 	load_sum = 0;
 	grid_import = 0;
+	grid_emissions = 0;
 	total_load = 0;
 	power_lost = 0;
 	max_charging_total = 0;
@@ -346,25 +350,28 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 	double b = 0.0; // Start simulation with an empty stationary battery
 	double c = 0.0; // Remaining solar energy after covering household and EV charging load
 	double d = 0.0; // Missing energy to cover household and EV charging load after using produced solar energy.
-
+	// Operation_policy = "no_ev";
 	// We assume that the initial battery charge of the EV comes from the grid.
 	if (Operation_policy != "no_ev")
 	{
-		initial_battery_level_ev = fmin(32.0, ev_battery_capacity * max_soc); // EV battery level at the start of the simulation
-		last_soc = initial_battery_level_ev;								  // EV battery level during the previous time step
+		initial_battery_level_ev = ev_battery_capacity * max_soc; // EV battery level at the start of the simulation
+		last_soc = initial_battery_level_ev;					  // EV battery level during the previous time step
 
 		grid_import = initial_battery_level_ev / eta_c_ev;
 		total_load = grid_import;
 		total_cost = grid_import * 0.07;
 		power_lost = grid_import - initial_battery_level_ev;
 		max_charging_total = grid_import;
+		grid_emissions += grid_import * 124; // Use average grid intensity of the year 2024. Source: https://www.carbonbrief.org/analysis-uks-electricity-was-cleanest-ever-in-2024/
 	}
 
-	int index_t_solar; // Current index in solar trace
-	int index_t_load;  // Current index in load trace
+	int index_t_solar;	   // Current index in solar trace
+	int index_t_load;	   // Current index in load trace
+	int index_t_intensity; // Current index in intensity trace
 
 	int trace_length_solar = solar_trace.size();
 	int trace_length_load = load_trace.size();
+	int trace_length_intensity = intensity_trace.size();
 
 	// Get start day of the simulation
 	int trace_days = min(trace_length_load / 24, trace_length_solar / 24);
@@ -382,7 +389,10 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 			int t = day * 24 + start_index + hour;
 			index_t_solar = t % trace_length_solar;
 			index_t_load = t % trace_length_load;
+			index_t_intensity = t % trace_length_intensity;
 			load_sum += load_trace[index_t_load];
+
+			double current_intensity = intensity_trace[index_t_intensity];
 
 			std::pair<double, double> operationResult;
 			// Household doesn't have an EV
@@ -394,7 +404,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 				c = solar_trace[index_t_solar] * pv - hourly_load; // Remaining solar power after covering load
 				d = hourly_load - solar_trace[index_t_solar] * pv; // Missing power to cover load
 
-				operationResult = no_ev(b, c, d, hour);
+				operationResult = no_ev(b, c, d, hour, current_intensity);
 			}
 			// Household has EV
 			else
@@ -421,7 +431,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 					c = solar_trace[index_t_solar] * pv - hourly_load; // Remaining solar power after covering load
 					d = hourly_load - solar_trace[index_t_solar] * pv; // Missing power to cover load
 
-					operationResult = safe_unidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour);
+					operationResult = safe_unidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour, current_intensity);
 				}
 				else if (Operation_policy == "hybrid_bidirectional")
 				{
@@ -438,7 +448,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 					c = solar_trace[index_t_solar] * pv - hourly_load; // Remaining solar power after covering load
 					d = hourly_load - solar_trace[index_t_solar] * pv; // Missing power to cover load
 
-					operationResult = hybrid_bidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour);
+					operationResult = hybrid_bidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour, current_intensity);
 				}
 				else
 				{
@@ -448,6 +458,7 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 
 				// Update battery levels
 				ev_b = operationResult.first;
+				std::cout << ev_b << endl;
 				last_soc = ev_b;
 			}
 			b = operationResult.second;
@@ -467,8 +478,8 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_in
 	}
 }
 
-void simulate(vector<double> &load_trace, vector<double> &solar_trace, int start_index, int end_index, double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start)
+void simulate(vector<double> &load_trace, vector<double> &solar_trace, vector<double> &intensity_trace, int start_index, int end_index, double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start)
 {
 	double loss = 0.0;
-	loss = sim(load_trace, solar_trace, start_index, end_index, 0, 4, b_0, evRecords, allDailyStatuses, max_soc, min_soc, Ev_start);
+	loss = sim(load_trace, solar_trace, intensity_trace, start_index, end_index, 0, 4, b_0, evRecords, allDailyStatuses, max_soc, min_soc, Ev_start);
 }

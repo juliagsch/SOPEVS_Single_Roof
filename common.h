@@ -17,6 +17,7 @@ extern int days_in_chunk;
 
 extern vector<double> load;
 extern vector<double> solar;
+extern vector<double> intensity;
 extern double battery_result;
 extern double pv_result;
 
@@ -54,6 +55,7 @@ extern int stat_charged;
 extern int stat_discharged;
 extern double grid_import;
 extern double total_load;
+extern double grid_emissions;
 extern double total_cost;
 extern double total_hours;
 extern double load_sum;			  // Total load used

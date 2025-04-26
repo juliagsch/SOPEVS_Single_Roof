@@ -15,7 +15,7 @@
 using namespace std;
 
 // chunk_size: length of time (in days)
-void run_simulations(vector<double> &load, vector<double> &solar, int metric, int chunk_size, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc)
+void run_simulations(vector<double> &load, vector<double> &solar, vector<double> &intensity, int metric, int chunk_size, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc)
 {
 
 	// set random seed to a specific value if you want consistency in results
@@ -36,7 +36,7 @@ void run_simulations(vector<double> &load, vector<double> &solar, int metric, in
 	double battery_cells = battery_result / kWh_in_one_cell;
 	pv_result = 4;
 
-	sim(load, solar, 0, t_chunk_size, battery_cells, pv_result, 0, evRecords, allDailyStatuses, max_soc, min_soc, Ev_start);
+	sim(load, solar, intensity, 0, t_chunk_size, battery_cells, pv_result, 0, evRecords, allDailyStatuses, max_soc, min_soc, Ev_start);
 }
 
 int main(int argc, char **argv)
@@ -65,10 +65,11 @@ int main(int argc, char **argv)
 	// Generate all daily statuses
 	std::vector<std::vector<EVStatus>> allDailyStatuses = generateAllDailyStatuses(evRecords);
 
-	run_simulations(load, solar, metric, days_in_chunk, evRecords, allDailyStatuses, max_soc, min_soc);
+	run_simulations(load, solar, intensity, metric, days_in_chunk, evRecords, allDailyStatuses, max_soc, min_soc);
 	cout << fixed << "Grid import: " << grid_import << endl; // Total electricity imported from grid
 	cout << "Total Cost: " << total_cost << endl;
 	cout << "Total Hours: " << total_hours << endl;
+	cout << "Grid Emissions: " << grid_emissions << endl;		// in g of CO2
 	cout << "Total load: " << total_load << endl;				// Total load (EV + household + (dis)charging loss)
 	cout << "EV Power Usage: " << ev_power_used << endl;		// EV power used to drive
 	cout << "Total Household Load: " << load_sum << endl;		// Total load used by household (excluding EV)

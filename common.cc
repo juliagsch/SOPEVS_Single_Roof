@@ -39,6 +39,7 @@ int stat_discharged = 0;
 double grid_import = 0.0;
 double total_load = 0.0;
 double total_cost = 0.0;
+double grid_emissions = 0.0;
 double total_hours = 0.0;
 double load_sum = 0;           // Total load used
 double ev_power_used = 0;      // Total power used by ev driving (discharging to power house not included)
@@ -58,6 +59,7 @@ int days_in_chunk;
 
 vector<double> load;
 vector<double> solar;
+vector<double> intensity;
 std::string wfh_type;
 
 vector<double> socValues;
@@ -356,6 +358,21 @@ int process_input(char **argv, bool process_metric_input)
 
     string pv_result_string = argv[++i];
     pv_result = stod(pv_result_string);
+
+    string intensity_file = argv[++i];
+    // read in data into vector
+    ifstream intensitystream(intensity_file.c_str());
+    intensity = read_data_from_file(intensitystream);
+
+#ifdef DEBUG
+    cout << "checking for errors in solar file..." << endl;
+#endif
+
+    if (intensity[0] < 0)
+    {
+        cerr << "error reading intensity file " << intensity_file << endl;
+        return 1;
+    }
 
 #ifdef DEBUG
     cout << " path_to_ev_data = " << path_to_ev_data << endl;

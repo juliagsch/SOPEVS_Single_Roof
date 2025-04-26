@@ -6,6 +6,7 @@ from test_utils import extract_result
 
 test_data_path = os.path.abspath("./tests/test_data")
 eta_ev = 0.935 # Charging and discharging efficiency of the EV
+intensity_path = f"{test_data_path}/intensities.txt"
 
 def test_unidirectional():
     house_file_path = f"{test_data_path}/house1.txt"
@@ -13,7 +14,7 @@ def test_unidirectional():
     ev_file_path = f"{test_data_path}/ev1.csv"
     op = "safe_unidirectional"
     num_days = 1
-    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4"
+    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4 {intensity_path}"
     result = subprocess.run(command.split(), stdout=subprocess.PIPE, text=True)
 
     # Extract numbers from output
@@ -34,7 +35,7 @@ def test_bidirectional():
     ev_file_path = f"{test_data_path}/ev1.csv"
     op = "hybrid_bidirectional"
     num_days = 1
-    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4"
+    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4 {intensity_path}"
     result = subprocess.run(command.split(), stdout=subprocess.PIPE, text=True)
     print(command)
     # Extract numbers from output
@@ -44,10 +45,10 @@ def test_bidirectional():
     assert result["household_load"] == 24
     assert result["total_hours"] == 24
     # Addition can lead to small rounding error, therefore we need to approximate.
-    assert result["total_load"] == pytest.approx(result["grid_import"]+10+5.333333, 1e-6) # EV is charged by 5.333333 kWh of solar power
+    assert result["total_load"] == pytest.approx(result["grid_import"]+10+2.74+2.133262, 1e-6) # EV is charged by 2.74+2.133262 kWh of solar power
     assert result["total_load"] == pytest.approx(result["household_load"]+result["ev_power_used"]+result["power_lost"]+result["ev_battery_diff"], 1e-6)
-    assert result["total_cost"] == pytest.approx((result["ev_power_charged"]-5.333333)*0.07 + 1*0.35, 1e-6) # We can always cover the household load from the EV battery or PV except during 1h (at 8am)
-    assert result["power_lost"] == pytest.approx((result["ev_power_charged"])*(1-eta_ev)+(13*((1.0 / eta_ev)-1)), 1e-6) # We discharge 13 kWh from the EV battery
+    assert result["total_cost"] == pytest.approx((result["ev_power_charged"]-(2.74+2.13326203209))*0.07, 1e-5) # We can always cover the household load from the EV battery or PV
+    assert result["power_lost"] == pytest.approx((result["ev_power_charged"])*(1-eta_ev)+(14*((1.0 / eta_ev)-1)), 1e-6) # We discharge 14 kWh from the EV battery
 
 def test_bidirectional_two_trips():
     house_file_path = f"{test_data_path}/house1.txt"
@@ -55,7 +56,7 @@ def test_bidirectional_two_trips():
     ev_file_path = f"{test_data_path}/ev2.csv"
     op = "hybrid_bidirectional"
     num_days = 1
-    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4"
+    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4 {intensity_path}"
     result = subprocess.run(command.split(), stdout=subprocess.PIPE, text=True)
     print(command)
     # Extract numbers from output
@@ -65,10 +66,10 @@ def test_bidirectional_two_trips():
     assert result["household_load"] == 24
     assert result["total_hours"] == 24
     # Addition can lead to small rounding error, therefore we need to approximate.
-    assert result["total_load"] == pytest.approx(result["grid_import"]+10+5.333333, 1e-6) # EV is charged by 5.333333 kWh of solar power
+    assert result["total_load"] == pytest.approx(result["grid_import"]+10+2.74+2.133262, 1e-6) # EV is charged by 2.74+2.133262 kWh (before first and second trip) of solar power
     assert result["total_load"] == pytest.approx(result["household_load"]+result["ev_power_used"]+result["power_lost"]+result["ev_battery_diff"], 1e-6)
-    assert result["total_cost"] == pytest.approx((result["ev_power_charged"]-5.333333)*0.07 + 3*0.35, 1e-6) # We can always cover the household load from the EV or PV except during 3h (1h before sunrise and 2h after sunset as the EV is away or charging)
-    assert result["power_lost"] == pytest.approx((result["ev_power_charged"])*(1-eta_ev)+(11*((1.0 / eta_ev)-1)), 1e-6) # We discharge 11 kWh from the EV battery
+    assert result["total_cost"] == pytest.approx((result["ev_power_charged"]-(2.74+2.13326203209))*0.07 + 2*0.35, 1e-5) # We can always cover the household load from the EV or PV except during 2h after sunset as the EV is away
+    assert result["power_lost"] == pytest.approx((result["ev_power_charged"])*(1-eta_ev)+(12*((1.0 / eta_ev)-1)), 1e-6) # We discharge 12 kWh from the EV battery
 
 def test_bidirectional_two_trips_no_load():
     house_file_path = f"{test_data_path}/house0.txt"
@@ -76,7 +77,7 @@ def test_bidirectional_two_trips_no_load():
     ev_file_path = f"{test_data_path}/ev2.csv"
     op = "hybrid_bidirectional"
     num_days = 1
-    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4"
+    command = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op} {ev_file_path} 0 4 {intensity_path}"
     result = subprocess.run(command.split(), stdout=subprocess.PIPE, text=True)
     print(command)
     # Extract numbers from output
@@ -97,8 +98,8 @@ def test_uni_vs_bi():
     op_uni = "safe_unidirectional"
     op_bi = "hybrid_bidirectional"
     num_days = 1
-    command_uni = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_uni} {ev_file_path} 0 4"
-    command_bi = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
+    command_uni = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_uni} {ev_file_path} 0 4 {intensity_path}"
+    command_bi = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path}"
 
     result_uni = subprocess.run(command_uni.split(), stdout=subprocess.PIPE, text=True)
     result_bi = subprocess.run(command_bi.split(), stdout=subprocess.PIPE, text=True)
@@ -121,8 +122,8 @@ def test_pv_vs_nopv():
     ev_file_path = f"{test_data_path}/ev1.csv"
     op_bi = "hybrid_bidirectional"
     num_days = 1
-    command_nopv = f"./bin_nopvbutev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
-    command_pv = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
+    command_nopv = f"./bin_nopvbutev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path} {intensity_path}"
+    command_pv = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path} {intensity_path}"
 
     result_nopv = subprocess.run(command_nopv.split(), stdout=subprocess.PIPE, text=True)
     result_pv = subprocess.run(command_pv.split(), stdout=subprocess.PIPE, text=True)
@@ -144,8 +145,8 @@ def test_pv_vs_nopv_zerosolar():
     ev_file_path = f"{test_data_path}/ev1.csv"
     op_bi = "hybrid_bidirectional"
     num_days = 1
-    command_nopv = f"./bin_nopvbutev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
-    command_pv = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4"
+    command_nopv = f"./bin_nopvbutev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path}"
+    command_pv = f"./bin_pvandev/sim 2100 480 10 20 1 0.5 0.95 {num_days} {house_file_path} {solar_file_path} 0.8 0.2 60.0 7.4 {op_bi} {ev_file_path} 0 4 {intensity_path}"
 
     result_nopv = subprocess.run(command_nopv.split(), stdout=subprocess.PIPE, text=True)
     result_pv = subprocess.run(command_pv.split(), stdout=subprocess.PIPE, text=True)

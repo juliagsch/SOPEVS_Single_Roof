@@ -25,10 +25,10 @@ double static eta_c_ev = 0.935;
 
 void update_parameters(double n);
 
-double sim(vector<double> &load_trace, vector<double> &solar_trace, int start_index, int end_index,
+double sim(vector<double> &load_trace, vector<double> &solar_trace, vector<double> &intensity_trace, int start_index, int end_index,
 		   double cells, double pv, double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start);
 
-void simulate(vector<double> &load_trace, vector<double> &solar_trace, int start_index, int end_index,
+void simulate(vector<double> &load_trace, vector<double> &solar_trace, vector<double> &intensity_trace, int start_index, int end_index,
 			  double b_0, std::vector<EVRecord> evRecords, std::vector<std::vector<EVStatus>> allDailyStatuses, double max_soc, double min_soc, int Ev_start);
 
 #endif
