@@ -335,7 +335,7 @@ int process_input(char **argv, bool process_metric_input)
     cout << "charging_rate_string = " << charging_rate_string << ", charging_rate = " << charging_rate << endl;
 #endif
 
-    std::set<std::string> validOperationPolicyOptions = {"optimal_unidirectional", "safe_unidirectional", "hybrid_unidirectional", "optimal_bidirectional", "hybrid_bidirectional", "safe_bidirectional", "hybrid_bidirectional", "no_ev"};
+    std::set<std::string> validOperationPolicyOptions = {"optimal_unidirectional", "safe_unidirectional", "safe_unidirectional_LBN", "hybrid_unidirectional", "optimal_bidirectional", "hybrid_bidirectional_LBN", "safe_bidirectional", "hybrid_bidirectional", "no_ev"};
 
     std::string operationPolicyInput = argv[++i];
 

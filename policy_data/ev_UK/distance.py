@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Read the CSV file into a DataFrame
-df = pd.read_csv("merged_T2_UK.csv")
+df = pd.read_csv("./policy_data/ev_UK/merged_T2_UK.csv")
 
 # Sum the values in the 'Distance (km)' column
 total_distance = df['Distance (km)'].sum()

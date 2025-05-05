@@ -100,7 +100,7 @@ double calc_max_discharging_ev(double power, double ev_b, double min_soc, double
 }
 
 // Returns true if the EV should currently be charging, false otherwise
-bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, int currentHour)
+bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, int currentHour, bool lbnCharging)
 {
 	// Find the next departure hour
 	int next_dept = -1;
@@ -111,6 +111,11 @@ bool get_is_charging(const std::vector<EVStatus> &dailyStatuses, double ev_b, in
 	if (next_dept == -1)
 	{
 		return false;
+	}
+	// Charge during LBN hours if the next departure is before the main solar generation hours.
+	else if (currentHour <= 4 && next_dept <= 9 && lbnCharging)
+	{
+		return true;
 	}
 
 	// Compute how many hours are needed to reach the max SOC.
@@ -436,7 +441,41 @@ double sim(vector<double> &load_trace, vector<double> &solar_trace, vector<doubl
 				else if (Operation_policy == "hybrid_bidirectional")
 				{
 					// Check if EV should currently be charging
-					isCharging = get_is_charging(allDailyStatuses[ev_day], ev_b, hour);
+					isCharging = get_is_charging(allDailyStatuses[ev_day], ev_b, hour, false);
+					if (isCharging)
+					{
+						maxCharging = get_maxCharging(ev_b);
+					}
+
+					double hourly_load = load_trace[index_t_load] + maxCharging;
+					total_load += hourly_load;
+
+					c = solar_trace[index_t_solar] * pv - hourly_load; // Remaining solar power after covering load
+					d = hourly_load - solar_trace[index_t_solar] * pv; // Missing power to cover load
+
+					operationResult = hybrid_bidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour, current_intensity);
+				}
+				if (Operation_policy == "safe_unidirectional_LBN")
+				{
+					// Check if EV should currently be charging
+					isCharging = get_is_charging(allDailyStatuses[ev_day], ev_b, hour, true);
+					if (isCharging)
+					{
+						maxCharging = get_maxCharging(ev_b);
+					}
+
+					double hourly_load = load_trace[index_t_load] + maxCharging;
+					total_load += hourly_load;
+
+					c = solar_trace[index_t_solar] * pv - hourly_load; // Remaining solar power after covering load
+					d = hourly_load - solar_trace[index_t_solar] * pv; // Missing power to cover load
+
+					operationResult = safe_unidirectional(b, ev_b, c, d, isCharging, maxCharging, isHome, hour, current_intensity);
+				}
+				else if (Operation_policy == "hybrid_bidirectional_LBN")
+				{
+					// Check if EV should currently be charging
+					isCharging = get_is_charging(allDailyStatuses[ev_day], ev_b, hour, true);
 					if (isCharging)
 					{
 						maxCharging = get_maxCharging(ev_b);
